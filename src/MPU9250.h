@@ -160,7 +160,7 @@
 #define FIFO_COUNTH        0x72
 #define FIFO_COUNTL        0x73
 #define FIFO_R_W           0x74
-#define WHO_AM_I_MPU9250   0x75 // Should return 0x71
+#define WHO_AM_I_MPU9250   0x75 // Should return 0x71 for MPU9250 or 0x73 for MPU9255
 #define XA_OFFSET_H        0x77
 #define XA_OFFSET_L        0x78
 #define YA_OFFSET_H        0x7A
@@ -214,7 +214,6 @@ class MPU9250
       M_100HZ = 0x06 // 100 Hz continuous magnetometer
     };
 
-    
     TwoWire * _wire;						// Allows for use of various I2C ports
     uint8_t _I2Caddr = MPU9250_ADDRESS_AD0;	// Use AD0 by default
 
@@ -229,12 +228,8 @@ class MPU9250
     uint8_t Ascale = AFS_2G;
     // Choose either 14-bit or 16-bit magnetometer resolution
     uint8_t Mscale = MFS_16BITS;
-
-    // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
+    // Choose either 8 Hz or 100 Hz continuous magnetometer data read
     uint8_t Mmode = M_8HZ;
-
-    
-    
 
     uint8_t writeByteWire(uint8_t, uint8_t, uint8_t);
     uint8_t writeByteSPI(uint8_t, uint8_t);

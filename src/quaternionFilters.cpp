@@ -11,8 +11,8 @@
 
 #include "quaternionFilters.h"
 
-// These are the free parameters in the Mahony filter and fusion scheme, Kp
-// for proportional feedback, Ki for integral
+// These are the free parameters in the Mahony filter and fusion scheme
+// Kp for proportional feedback, Ki for integral
 #define Kp 2.0f * 5.0f
 #define Ki 0.0f
 
@@ -32,6 +32,7 @@ static float GyroMeasDrift = PI * (0.0f  / 180.0f);
 // the faster the solution converges, usually at the expense of accuracy.
 // In any case, this is the free parameter in the Madgwick filtering and
 // fusion scheme.
+
 static float beta = sqrt(3.0f / 4.0f) * GyroMeasError;   // Compute beta
 // Compute zeta, the other free parameter in the Madgwick scheme usually
 // set to a small or zero value
@@ -212,7 +213,7 @@ void MahonyQuaternionUpdate(float ax, float ay, float az, float gx, float gy, fl
   gx = gx + Kp * ex + Ki * eInt[0];
   gy = gy + Kp * ey + Ki * eInt[1];
   gz = gz + Kp * ez + Ki * eInt[2];
- 
+
   // Integrate rate of change of quaternion
   pa = q2;
   pb = q3;
