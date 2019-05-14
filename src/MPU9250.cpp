@@ -617,6 +617,50 @@ void MPU9250::MPU9250SelfTest(float * destination)
   }
 }
 
+void MPU9250::magContinuousCalMPU9250(int16_t * mag_temp, float * bias_dest, float * scale_dest)
+{
+  int32_t mag_bias[3]  = {0, 0, 0},
+          mag_scale[3] = {0, 0, 0};
+  for (int jj = 0; jj < 3; jj++)
+  {
+    if (mag_temp[jj] > mag_max[jj])
+    {
+      mag_max[jj] = mag_temp[jj];
+    }
+    if (mag_temp[jj] < mag_min[jj])
+    {
+      mag_min[jj] = mag_temp[jj];
+    }
+  }
+  // Get hard iron correction
+  // Get 'average' x mag bias in counts
+  mag_bias[0]  = (mag_max[0] + mag_min[0]) / 2;
+  // Get 'average' y mag bias in counts
+  mag_bias[1]  = (mag_max[1] + mag_min[1]) / 2;
+  // Get 'average' z mag bias in counts
+  mag_bias[2]  = (mag_max[2] + mag_min[2]) / 2;
+
+  // Save mag biases in G for main program
+  bias_dest[0] = (float)mag_bias[0] * mRes * factoryMagCalibration[0];
+  bias_dest[1] = (float)mag_bias[1] * mRes * factoryMagCalibration[1];
+  bias_dest[2] = (float)mag_bias[2] * mRes * factoryMagCalibration[2];
+
+  // Get soft iron correction estimate
+  // Get average x axis max chord length in counts
+  mag_scale[0]  = (mag_max[0] - mag_min[0]) / 2;
+  // Get average y axis max chord length in counts
+  mag_scale[1]  = (mag_max[1] - mag_min[1]) / 2;
+  // Get average z axis max chord length in counts
+  mag_scale[2]  = (mag_max[2] - mag_min[2]) / 2;
+
+  float avg_rad = mag_scale[0] + mag_scale[1] + mag_scale[2];
+  avg_rad /= 3.0;
+
+  scale_dest[0] = avg_rad / ((float)mag_scale[0]);
+  scale_dest[1] = avg_rad / ((float)mag_scale[1]);
+  scale_dest[2] = avg_rad / ((float)mag_scale[2]);
+}
+
 // Function which accumulates magnetometer data after device initialization.
 // It calculates the bias and scale in the x, y, and z axes.
 void MPU9250::magCalMPU9250(float * bias_dest, float * scale_dest)
