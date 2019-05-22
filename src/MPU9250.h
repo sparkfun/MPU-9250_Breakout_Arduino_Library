@@ -160,7 +160,7 @@
 #define FIFO_COUNTH        0x72
 #define FIFO_COUNTL        0x73
 #define FIFO_R_W           0x74
-#define WHO_AM_I_MPU9250   0x75 // Should return 0x71
+#define WHO_AM_I_MPU9250   0x75 // Should return 0x71 for MPU9250 or 0x73 for MPU9255
 #define XA_OFFSET_H        0x77
 #define XA_OFFSET_L        0x78
 #define YA_OFFSET_H        0x7A
@@ -214,11 +214,10 @@ class MPU9250
       M_100HZ = 0x06 // 100 Hz continuous magnetometer
     };
 
-    
     TwoWire * _wire;						// Allows for use of various I2C ports
     uint8_t _I2Caddr = MPU9250_ADDRESS_AD0;	// Use AD0 by default
 
- 	SPIClass * _spi;						// Allows for use of different SPI ports
+ 	  SPIClass * _spi;						// Allows for use of different SPI ports
     int8_t _csPin; 							// SPI chip select pin
 
     uint32_t _interfaceSpeed;				// Stores the desired I2C or SPi clock rate
@@ -229,12 +228,8 @@ class MPU9250
     uint8_t Ascale = AFS_2G;
     // Choose either 14-bit or 16-bit magnetometer resolution
     uint8_t Mscale = MFS_16BITS;
-
-    // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
+    // Choose either 8 Hz or 100 Hz continuous magnetometer data read
     uint8_t Mmode = M_8HZ;
-
-    
-    
 
     uint8_t writeByteWire(uint8_t, uint8_t, uint8_t);
     uint8_t writeByteSPI(uint8_t, uint8_t);
@@ -247,9 +242,10 @@ class MPU9250
     void select();
     void deselect();
     void setupMagForSPI();
-// TODO: Remove this next line
-public:
-    uint8_t ak8963WhoAmI_SPI();
+
+  // TODO: Remove this next line
+  public:
+      uint8_t ak8963WhoAmI_SPI();
 
   public:
     float pitch, yaw, roll;
@@ -274,10 +270,14 @@ public:
     float gyroBias[3]  = {0, 0, 0},
           accelBias[3] = {0, 0, 0},
           magBias[3]   = {0, 0, 0},
-          magScale[3]  = {0, 0, 0};
+          magScale[3]  = {1, 1, 1};
     float selfTest[6];
     // Stores the 16-bit signed accelerometer sensor output
     int16_t accelCount[3];
+
+    // For continous calibration
+    int16_t mag_max[3] =  {-32768, -32768, -32768},
+            mag_min[3] = {32767, 32767, 32767};
 
     // Public method declarations
     MPU9250( int8_t csPin, SPIClass &spiInterface = SPI, uint32_t spi_freq = SPI_DATA_RATE);
@@ -294,7 +294,8 @@ public:
     void initMPU9250();
     void calibrateMPU9250(float * gyroBias, float * accelBias);
     void MPU9250SelfTest(float * destination);
-    void magCalMPU9250(float * dest1, float * dest2);
+    void magCalMPU9250(float * bias_dest, float * scale_dest);
+    void magContinuousCalMPU9250(int16_t * mag_temp, float * bias_dest, float * scale_dest);
     uint8_t writeByte(uint8_t, uint8_t, uint8_t);
     uint8_t readByte(uint8_t, uint8_t);
     uint8_t readBytes(uint8_t, uint8_t, uint8_t, uint8_t *);

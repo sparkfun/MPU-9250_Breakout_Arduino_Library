@@ -511,7 +511,7 @@ void MPU9250::MPU9250SelfTest(float * destination)
   int32_t gAvg[3] = {0}, aAvg[3] = {0}, aSTAvg[3] = {0}, gSTAvg[3] = {0};
   float factoryTrim[6];
   uint8_t FS = GFS_250DPS;
-   
+
   writeByte(_I2Caddr, SMPLRT_DIV, 0x00);    // Set gyro sample rate to 1 kHz
   writeByte(_I2Caddr, CONFIG, 0x02);        // Set gyro sample rate to 1 kHz and DLPF to 92 Hz
   writeByte(_I2Caddr, GYRO_CONFIG, FS<<3);  // Set full scale range for the gyro to 250 dps
@@ -519,16 +519,16 @@ void MPU9250::MPU9250SelfTest(float * destination)
   writeByte(_I2Caddr, ACCEL_CONFIG, FS<<3); // Set full scale range for the accelerometer to 2 g
 
   for( int ii = 0; ii < 200; ii++) {  // get average current values of gyro and acclerometer
-  
+
     readBytes(_I2Caddr, ACCEL_XOUT_H, 6, &rawData[0]);        // Read the six raw data registers into data array
     aAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
-    aAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;  
-    aAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ; 
-  
+    aAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
+    aAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
+
     readBytes(_I2Caddr, GYRO_XOUT_H, 6, &rawData[0]);       // Read the six raw data registers sequentially into data array
     gAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
-    gAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;  
-    gAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ; 
+    gAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
+    gAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
   }
 
   // Get average of 200 values and store as average current readings
@@ -617,6 +617,50 @@ void MPU9250::MPU9250SelfTest(float * destination)
   }
 }
 
+void MPU9250::magContinuousCalMPU9250(int16_t * mag_temp, float * bias_dest, float * scale_dest)
+{
+  int32_t mag_bias[3]  = {0, 0, 0},
+          mag_scale[3] = {0, 0, 0};
+  for (int jj = 0; jj < 3; jj++)
+  {
+    if (mag_temp[jj] > mag_max[jj])
+    {
+      mag_max[jj] = mag_temp[jj];
+    }
+    if (mag_temp[jj] < mag_min[jj])
+    {
+      mag_min[jj] = mag_temp[jj];
+    }
+  }
+  // Get hard iron correction
+  // Get 'average' x mag bias in counts
+  mag_bias[0]  = (mag_max[0] + mag_min[0]) / 2;
+  // Get 'average' y mag bias in counts
+  mag_bias[1]  = (mag_max[1] + mag_min[1]) / 2;
+  // Get 'average' z mag bias in counts
+  mag_bias[2]  = (mag_max[2] + mag_min[2]) / 2;
+
+  // Save mag biases in G for main program
+  bias_dest[0] = (float)mag_bias[0] * mRes * factoryMagCalibration[0];
+  bias_dest[1] = (float)mag_bias[1] * mRes * factoryMagCalibration[1];
+  bias_dest[2] = (float)mag_bias[2] * mRes * factoryMagCalibration[2];
+
+  // Get soft iron correction estimate
+  // Get average x axis max chord length in counts
+  mag_scale[0]  = (mag_max[0] - mag_min[0]) / 2;
+  // Get average y axis max chord length in counts
+  mag_scale[1]  = (mag_max[1] - mag_min[1]) / 2;
+  // Get average z axis max chord length in counts
+  mag_scale[2]  = (mag_max[2] - mag_min[2]) / 2;
+
+  float avg_rad = mag_scale[0] + mag_scale[1] + mag_scale[2];
+  avg_rad /= 3.0;
+
+  scale_dest[0] = avg_rad / ((float)mag_scale[0]);
+  scale_dest[1] = avg_rad / ((float)mag_scale[1]);
+  scale_dest[2] = avg_rad / ((float)mag_scale[2]);
+}
+
 // Function which accumulates magnetometer data after device initialization.
 // It calculates the bias and scale in the x, y, and z axes.
 void MPU9250::magCalMPU9250(float * bias_dest, float * scale_dest)
@@ -633,14 +677,14 @@ void MPU9250::magCalMPU9250(float * bias_dest, float * scale_dest)
 
   Serial.println(F("Mag Calibration: Wave device in a figure 8 until done!"));
   Serial.println(
-      F("  4 seconds to get ready followed by 15 seconds of sampling)"));
+      F("  4 seconds to get ready followed by 15 seconds of sampling"));
   delay(4000);
 
   // shoot for ~fifteen seconds of mag data
   // at 8 Hz ODR, new mag data is available every 125 ms
   if (Mmode == M_8HZ)
   {
-    sample_count = 128;
+    sample_count = 120;
   }
   // at 100 Hz ODR, new mag data is available every 10 ms
   if (Mmode == M_100HZ)
@@ -650,6 +694,9 @@ void MPU9250::magCalMPU9250(float * bias_dest, float * scale_dest)
 
   for (ii = 0; ii < sample_count; ii++)
   {
+    if ((ii % (sample_count/15)) == 0)
+      Serial.println(F("keep waving..."));
+
     readMagData(mag_temp);  // Read the mag data
 
     for (int jj = 0; jj < 3; jj++)
@@ -768,7 +815,7 @@ uint8_t MPU9250::readByte(uint8_t deviceAddress, uint8_t registerAddress)
     else
     {
       return readByteSPI(registerAddress);
-    } 
+    }
   }
   else
   {
@@ -790,17 +837,17 @@ uint8_t MPU9250::readMagByteSPI(uint8_t registerAddress)
   uint32_t count = 0;
   while(((I2C_MASTER_STATUS & 0b01000000) == 0) && (count++ < 100000))            // Checks against the I2C_SLV4_DONE bit in the I2C master status register
   {
-    I2C_MASTER_STATUS = readByteSPI(54);  
+    I2C_MASTER_STATUS = readByteSPI(54);
   }
   if(count > 10000)
   {
     Serial.println(F("Timed out"));
   }
-  
-  
 
 
-  return readByteSPI(53);   // Read the data that is in the SLV4_DI register 
+
+
+  return readByteSPI(53);   // Read the data that is in the SLV4_DI register
 }
 
 uint8_t MPU9250::writeMagByteSPI(uint8_t registerAddress, uint8_t data)
@@ -816,7 +863,7 @@ uint8_t MPU9250::writeMagByteSPI(uint8_t registerAddress, uint8_t data)
   uint32_t count = 0;
   while(((I2C_MASTER_STATUS & 0b01000000) == 0) && (count++ < 10000))            // Checks against the I2C_SLV4_DONE bit in the I2C master status register
   {
-    I2C_MASTER_STATUS = readByteSPI(54);  
+    I2C_MASTER_STATUS = readByteSPI(54);
   }
   if(count > 10000)
   {
